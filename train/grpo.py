@@ -34,7 +34,6 @@ from datasets import load_dataset, load_from_disk
 
 from trl import (
     DatasetMixtureConfig,
-    GRPOConfig,
     GRPOTrainer,
     ModelConfig,
     ScriptArguments,
@@ -42,9 +41,14 @@ from trl import (
     get_dataset,
     get_peft_config,
 )
+from train.configs import GRPOConfig
 from trl.rewards import get_soft_overlong_punishment, think_format_reward
 from transformers.trainer_utils import get_last_checkpoint
 from utils.utils import make_conversation, convert_to_serializable
+
+import swanlab
+from swanlab.integration.transformers import SwanLabCallback
+
 logger = logging.get_logger(__name__)
 
 # Enable logging in a Hugging Face Space
@@ -88,6 +92,10 @@ class GRPOScriptArguments(ScriptArguments):
             "`get_soft_overlong_punishment` (used value are `max_completion_len=1280`, `soft_punish_cache=256`), or "
             "any dotted import path (e.g., `'my_lib.rewards.custom_reward'`)."
         },
+    )
+    dataset_prompt_column: str = field(
+        default="prompt",
+        metadata={"help": "Column to use as prompts for training."},
     )
 
 
@@ -156,6 +164,12 @@ def main(script_args, training_args, model_args, dataset_args):
     # else:
     #     raise ValueError("Either `datasets` or `dataset_name` must be provided.")
 
+    # Initialize the SwanLab callback
+    swanlab_callback = SwanLabCallback(
+    project="codapo", 
+    experiment_name=training_args.output_dir.replace("/", "_")
+    )
+
     # Initialize the GRPO trainer
     trainer = GRPOTrainer(
         model=model_args.model_name_or_path,
@@ -164,6 +178,7 @@ def main(script_args, training_args, model_args, dataset_args):
         train_dataset=dataset[script_args.dataset_train_split],
         eval_dataset=dataset[script_args.dataset_test_split] if training_args.eval_strategy != "no" else None,
         peft_config=get_peft_config(model_args),
+        callbacks=[swanlab_callback],
     )
 
     # Train the model

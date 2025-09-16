@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=5 trl vllm-serve --model Qwen/Qwen2.5-Math-1.5B --host localhost --tensor_parallel_size 1 --port 8766
